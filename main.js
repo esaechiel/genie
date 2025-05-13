@@ -1,97 +1,103 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import puppeteer from 'puppeteer';
+import runDunningData from './dunningData.js'
+import addMoney from './sitiPay.js'
+import runDunning from './runDunning.js'
+import { loadCredentials, loadSitiMM } from './credentials.js';
+import { getCredentials } from './credentials.js';
+import { askObjective } from './inputHelper.js';
+import { loginOYC } from './login.js';
+import { logout } from './logoutHandler.js'
+import { runSearchSiti } from './searchHandler.js'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const startTime = performance.now();
 
-
-let captchaCode = '';
-
-async function createWindow() {
-  //console.log('Creating Electron window...');
-  // Create the Electron window
-  const win = new BrowserWindow({
-    width: 600,
-    height: 400,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false
-    }
+async function runPuppeteer() {
+  console.log('🚀 Initialising...');
+  const browser = await puppeteer.launch({
+    headless: true,
+    defaultViewport: {
+      width: 1280,
+      height: 800,
+      deviceScaleFactor: 3, // Increase to 3 for high-DPI
+    },
   });
-
-  const captchaImagePath = path.join(__dirname, 'captcha_screenshot.png');
-
-  const imageUrl = `file://${captchaImagePath.replace(/\\/g, '/')}`;
-
-  // Load the captcha page in the Electron window
-  win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
-    <html>
-      <body>
-        <h2>Please solve the captcha</h2>
-        <img src="${imageUrl}" alt="Captcha">
-        <input type="text" id="captcha-input" placeholder="Enter captcha" />
-        <button id="submit-captcha">Submit</button>
-
-        <script>
-          const { ipcRenderer } = require('electron');
-
-          // Focus the captcha input immediately
-        window.onload = function() {
-          document.getElementById('captcha-input').focus();
+  let loggedIn = false;
+  let exitFlag = false;
+  do{
+    const objective = await askObjective();
+    console.log(`You have selected - ${objective.label}`);
+    let choice = objective.value;
+    let credentials = null;
+    switch (choice){
+      case '0': //just login
+        if (!loggedIn){
+          console.log('Attempting Login...');
+          credentials = await loadCredentials();
+          console.log(`🔐 Logging in as ${credentials.label}`);
+          await loginOYC(browser);
+          loggedIn = true;
         }
+        else{
+          credentials = await getCredentials();
+          console.log(`Already logged in as ${credentials.label}`);
+        }
+      break;
+      case '1': //add money
+        console.log('Adding Money...');
+        credentials = await loadCredentials();
+        console.log(`🔐 Logging in as ${credentials.label}`);
+        await addMoney(browser);
+      break;
+      case '2': //get dunning data
+        console.log('Getting Dunning Data...');
+        if (!loggedIn){
+          credentials = await loadCredentials();
+          console.log(`🔐 Logging in as ${credentials.label}`);
+          await loginOYC(browser);
+          loggedIn = true;
+        }
+        await runDunningData(browser);
+      break;
+      case '3': //run dunning
+        if (!loggedIn){
+          credentials = await loadCredentials();
+          console.log(`🔐 Logging in as ${credentials.label}`);
+          await loginOYC(browser);
+          loggedIn = true;
+        }
+        console.log('Recharging Accounts...');
+        await runDunning(browser);
+      break;
+      case '4': //search
+        if (!loggedIn){
+          credentials = await loadSitiMM();
+          console.log(`🔐 Logging in as ${credentials.label}`);
+          await loginOYC(browser);
+          loggedIn = true;
+        }
+        console.log('Searching...');
+        await runSearchSiti(browser , 'VC' , '01330267067');
+      break;
+      case '5': //logout
+        if(loggedIn){
+          await logout(browser);
+          loggedIn = false;
+        }
+        else{
+          console.log('Logged out already');
+        }
+      break;
+      case '-9999': //exit
+        console.log(`Exiting...`);
+        await browser.close();
+        exitFlag=true;  
+      break;
+    }
+  }while(!exitFlag);
 
-          // When Enter is pressed, simulate the click of the submit button
-          document.getElementById('captcha-input').addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-              document.getElementById('submit-captcha').click();
-            }
-          });
-
-          // When the Submit button is clicked
-          document.getElementById('submit-captcha').onclick = function() {
-            const captcha = document.getElementById('captcha-input').value;
-            ipcRenderer.send('captcha-solved', captcha);
-          }
-        </script>
-      </body>
-    </html>
-  `));
-
-  ipcMain.on('captcha-solved', (event, captcha) => {
-    captchaCode = captcha;
-    //console.log(`✅ Captcha solved: ${captchaCode}`);
-
-    // Write the captcha code to a text file
-    fs.writeFileSync('captcha_code.txt', captchaCode, 'utf8', (err) => {
-      if (err) {
-        console.error('❌ Error writing captcha code to file:', err);
-      } else {
-        //console.log('✅ Captcha code written to file');
-      }
-    });
-
-    // Close the window after captcha is solved
-    win.close();
-  });
-}
-
-app.on('ready', () => {
-  //console.log('Electron app is ready!');
-  createWindow();
-});
-
-app.on('window-all-closed', () => {
-  //console.log('All windows closed');
-  if (process.platform !== 'darwin') {
-    app.quit();
+    const endTime = performance.now();  // End measuring
+    const executionTime =Math.round(((endTime - startTime) / 1000) * 100) / 100;  // Convert to seconds
+    console.log(`Total script execution time: ${executionTime} seconds`);
   }
-});
 
-app.on('quit', () => {
-  //console.log('Electron app is quitting...');
-});
+runPuppeteer();

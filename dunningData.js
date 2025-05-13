@@ -1,12 +1,13 @@
 // dunning.js
-export default async function runDunningData(page) {
-  await page.goto('http://biz.sitinetworks.com/Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'networkidle2' });
+export default async function runDunningData(browser) {
+  const page = await browser.newPage();
+  await page.goto('http://biz.sitinetworks.com/Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
 
   const balance = await page
     .$eval('#ctl00_ContentPlaceHolder1_lblDealerWalletAmount', el => el.innerText)
     .catch(() => '');
 
-  await page.goto('http://biz.sitinetworks.com/Reports/CustomerDueReport_Prepaid.aspx?Days=0');
+  await page.goto('http://biz.sitinetworks.com/Reports/CustomerDueReport_Prepaid.aspx?Days=0' , { waitUntil: 'domcontentloaded' });
 
   const rechargeData = await page.evaluate(() => {
     const links = Array.from(document.querySelectorAll('a'));

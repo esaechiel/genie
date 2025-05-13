@@ -30,6 +30,32 @@ export async function loadCredentials() {
   return selected;
 }
 
+export async function loadSitiMM() {
+  selected = {
+    label: 'MM',
+    userId: process.env.SITI_USER_ID_MM,
+    password: process.env.SITI_PASSWORD_MM,
+    itzPassword: process.env.SITI_ITZ_PASSWORD_MM
+  }
+  if (!selected.userId || !selected.password || !selected.itzPassword) {
+    throw new Error('❌ Missing credentials in .env file');
+  }
+  return selected;
+}
+
+export async function loadSitiRM() {
+  selected = {
+    label: 'RM',
+    userId: process.env.SITI_USER_ID_RM,
+    password: process.env.SITI_PASSWORD_RM,
+    itzPassword: process.env.SITI_ITZ_PASSWORD_RM
+  }
+  if (!selected.userId || !selected.password || !selected.itzPassword) {
+    throw new Error('❌ Missing credentials in .env file');
+  }
+  return selected;
+}
+
 export function getCredentials() {
   if (!selected) throw new Error('⚠️ Credentials not loaded yet.');
   return selected;

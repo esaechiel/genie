@@ -1,36 +1,7 @@
-import puppeteer from 'puppeteer';
-import { exec } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import runDunningData from './dunningData.js'
-import addMoney from './sitiPay.js'
-import runDunning from './runDunning.js'
-import { loadCredentials } from './credentials.js';
 import { getCredentials } from './credentials.js';
+import readline from 'readline';
+import { solveCaptcha } from './captchaHandler.js';
 
-const credentials = await loadCredentials();
-console.log(`🔐 Logging in as ${credentials.label}`);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const startTime = performance.now();
-
-const solveCaptcha = () => {
-  return new Promise((resolve, reject) => {
-    const pythonScriptPath = path.join(__dirname, 'solver.py');
-    const command = `python3 "${pythonScriptPath}"`; // Use "python3" if needed
-
-    exec(command, (error, stdout) => {
-      if (error) {
-        console.error(`❌ Python error: ${error}`);
-        reject(error);
-        return;
-      }
-      resolve(stdout.trim());
-    });
-  });
-};
 
 function updateInlineStatus(message) {
   process.stdout.clearLine(0);    // Clear the current line
@@ -39,40 +10,34 @@ function updateInlineStatus(message) {
 }
 
 
-async function runPuppeteer() {
-  console.log('🚀 Initialising...');
-  const browser = await puppeteer.launch({
-    headless: true,
-    defaultViewport: {
-      width: 1280,
-      height: 800,
-      deviceScaleFactor: 3, // Increase to 3 for high-DPI
-    },
-  });
+export async function loginOYC(browser) {
+
   const sitiCableTab = await browser.newPage();
   const { userId, password, itzPassword } = getCredentials();
 
   let success = false;
-  let attempts = 0;
-
-  console.log(`🌀 Login Attempt ${attempts + 1}`);
+  let attempts = 1;
+  let subAttempts = 1;
   while (attempts < 5 && !success) {
-
+    if(subAttempts === 1){
+      if(attempts > 1){
+        readline.clearLine(process.stdout, 0);
+        readline.moveCursor(process.stdout, 0, -1);
+        readline.clearLine(process.stdout, 0);
+        readline.cursorTo(process.stdout, 0);
+      }
+    process.stdout.write(`Login Attempt ${attempts}\n\r`);
+  }
     updateInlineStatus(`🌐 Opening Siti Networks...`);
-    await sitiCableTab.goto('https://biz.sitinetworks.com');
-
-    updateInlineStatus(`🔐 Entering credentials...`);
-    await sitiCableTab.type('#ctl00_ContentPlaceHolder1_txtUserID', userId);
-    await sitiCableTab.type('#ctl00_ContentPlaceHolder1_txtPassword', password);
+    await sitiCableTab.goto('https://biz.sitinetworks.com' , { waitUntil: 'networkidle0' });
 
     updateInlineStatus(`🖼️ Capturing captcha...`);
     const captchaElement = await sitiCableTab.$('#ctl00_ContentPlaceHolder1_CaptchaCode1_Image1');
     if (!captchaElement) {
-      console.log('❌ Captcha image not found. Exiting...');
-      break;
+      console.log('❌ Captcha image not found. Retrying...');
+      continue;
     }
     await captchaElement.screenshot({ path: 'captcha_screenshot.png' });
-
     updateInlineStatus(`🤖 Solving captcha...`);
     let captchaCode;
     try {
@@ -81,15 +46,16 @@ async function runPuppeteer() {
       console.error('❌ Failed to solve captcha');
       break;
     }
-
     if (captchaCode === '-1') {
       updateInlineStatus(`🔁 Captcha failed, retrying...`);
+      subAttempts++;
       continue; // Retry the loop
     }
-
     updateInlineStatus(`✅ Captcha solved: ${captchaCode}`);
     await sitiCableTab.type('#ctl00_ContentPlaceHolder1_CaptchaCode1_txtCapchaCode', captchaCode);
-
+    updateInlineStatus(`🔐 Entering credentials...`);
+    await sitiCableTab.type('#ctl00_ContentPlaceHolder1_txtUserID', userId);
+    await sitiCableTab.type('#ctl00_ContentPlaceHolder1_txtPassword', password);
     updateInlineStatus(`🚪 Logging in...`);
     try {
       await Promise.all([
@@ -107,34 +73,16 @@ async function runPuppeteer() {
     if (errorText.includes('Invalid captcha code')) {
       updateInlineStatus(`⚠️ Invalid captcha entered.`);
       attempts++;
-      updateInlineStatus(`🌀 Login Attempt ${attempts + 1}\n`);
+      subAttempts = 1;
       continue;
     } else {
-      console.log('\nWe`re in');
-      console.log('Getting Dunning Data...');
-      await runDunningData(sitiCableTab);
-      //await addMoney(browser,sitiCableTab);
-      await runDunning(browser,sitiCableTab);
+      updateInlineStatus('We`re in\n');
       success = true;
       break;
     }
   }
 
-
-  if (success) {
-    console.log('✅ Capturing full pages screenshot...');
-    await sitiCableTab.screenshot({ path: 'sitiCableTab_screenshot.png', fullPage: true });
-  } else {
+  if (!success) {
     console.log('❌ Exceeded max attempts. Login failed.');
   }
-
-  await browser.close();
-
-  const endTime = performance.now();  // End measuring
-  const executionTime =Math.round(((endTime - startTime) / 1000) * 100) / 100;  // Convert to seconds
-  console.log(`Total script execution time: ${executionTime} seconds`);
-
 }
-
-runPuppeteer();
-

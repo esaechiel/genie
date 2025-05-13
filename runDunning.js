@@ -1,5 +1,6 @@
 import { ConsoleMessage } from 'puppeteer';
 import { askDaysInput } from './inputHelper.js';
+import { getCredentials } from './credentials.js';
 
 function updateInlineStatus(message) {
   process.stdout.clearLine(0);    // Clear the current line
@@ -74,9 +75,9 @@ async function waitForPageUpdateAfterSubmit(page, submitSelector) {
 }
 
 
-export default async function runDunning(browser, page) {
+export default async function runDunning(browser) {
     const page2 = await browser.newPage();
-    await page2.goto('http://biz.sitinetworks.com//Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'networkidle2' });
+    await page2.goto('http://biz.sitinetworks.com//Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
   
     try {
       await selectDayRange(page2);
@@ -111,7 +112,7 @@ export default async function runDunning(browser, page) {
       else{
         console.log('❌ Insufficient balance');
       }
-      await page2.screenshot({ path: 'sitiDunning_screenshot.png', fullPage: true });
+      //await page2.screenshot({ path: 'sitiDunning_screenshot.png', fullPage: true });
   
     } catch (err) {
       console.log('❌ Error occurred:', err.message);

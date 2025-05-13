@@ -1,4 +1,6 @@
 import readline from 'readline';
+import enquirer from 'enquirer';
+const { Input, Confirm } = enquirer;
 
 function askQuestion(query) {
   const rl = readline.createInterface({
@@ -44,14 +46,59 @@ export async function askDaysInput() {
   return await askFromMenu('Select how many days of records to fill:', options);
 }
 
-export async function askAmountChoice() {
-  const options = [
-    { label: '₹30 per invoice', value: '30' },
-    { label: '₹60 per invoice', value: '60' },
-    { label: '₹90 per invoice', value: '90' },
-  ];
-  return await askFromMenu('Select the amount to fill for each invoice:', options);
+export async function askAmount() {
+  let amount;
+
+  while (true) {
+    const inputPrompt = new Input({
+      message: 'Enter the amount to fill for each invoice:',
+      validate(value) {
+        return /^\d+$/.test(value) ? true : 'Please enter numbers only';
+      }
+    });
+
+    const input = await inputPrompt.run();
+    amount = Number(input);
+
+    if (amount < 1000) {
+      console.log('❌ Amount must be at least ₹1000. Please try again.\n');
+      continue;
+    }
+
+    if (amount > 10000) {
+      const confirmPrompt = new Confirm({
+        message: `You entered ₹${amount}. Are you sure you want to continue?`
+      });
+
+      const confirmed = await confirmPrompt.run();
+      if (!confirmed) {
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  return amount;
 }
+
+export async function askMobile() {
+  while (true) {
+    const inputPrompt = new Input({
+      message: 'Enter a 10-digit mobile number:',
+      validate(value) {
+        return /^\d{10}$/.test(value) ? true : 'Please enter valid a mobile number';
+      }
+    });
+
+    const mob = await inputPrompt.run();
+
+    if (/^\d{10}$/.test(mob)) {
+      return mob; // Valid input — return it
+    }
+  }
+}
+
 
 export async function askAccount() {
   const options = [
@@ -59,4 +106,19 @@ export async function askAccount() {
     { label: 'RM', value: '1' }
   ];
   return await askFromMenu('Select account:', options);
+}
+
+export async function askObjective() {
+  const options = [
+    { label: 'Log in OYC', value: '0' },
+    { label: 'Add Money', value: '1' },
+    { label: 'Get Dunning Data', value: '2' },
+    { label: 'Run Dunning', value: '3' },
+    { label: 'Search', value: '4' },
+    { label: 'Logout', value: '5' },
+    { label: 'Exit', value: '-9999' },
+
+  ];
+  const index =  await askFromMenu('What would you like to do:', options);
+  return options.find(opt => opt.value === index);
 }
