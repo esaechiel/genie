@@ -1,6 +1,11 @@
+import fs from 'fs';
 import { getCredentials } from './credentials.js';
 import { askAmount,askMobile } from './inputHelper.js';
 import { pressAnyKeyToContinue } from './continueHandler.js';
+
+if (!fs.existsSync('Payment_Screenshots')) {
+  fs.mkdirSync('Payment_Screenshots');
+}
 
 function updateInlineStatus(message) {
   process.stdout.clearLine(0);    // Clear the current line
@@ -10,11 +15,44 @@ function updateInlineStatus(message) {
 
 async function countdown(seconds) {
     for (let i = seconds; i > 0; i--) {
-      process.stdout.write(`⏳ Waiting for the page to load (${i} seconds)\r`);
+      process.stdout.write(`⏳ Waiting for the page to load (${i} seconds)  \r`);
       await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    process.stdout.write(`✅ Done!                                              `);
+    }updateInlineStatus('');
+}
+
+async function waitForPreloaderToDisappear(page, timeout = 30000) {
+  try {
+    await page.waitForFunction(() => {
+      const spinner = document.querySelector('#form1 > div:nth-child(6) > div > div > i');
+      return !spinner || spinner.offsetParent === null || spinner.style.display === 'none';
+    }, { timeout });
+  } catch (err) {
+    console.warn('⚠️ Timeout while waiting for preloader to disappear:', err.message);
   }
+}
+
+
+function getReceiptScreenshotFilename(folder = 'Payment_Screenshots') {
+  const cred = getCredentials(); 
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(now);
+  const getPart = (type) => parts.find(p => p.type === type)?.value || '';
+
+  const date = `${getPart('day')}-${getPart('month')}-${getPart('year')}`;
+  const time = `${getPart('hour')}-${getPart('minute')}`;
+
+  return `${folder}/Payment_${cred.label}_${date}_${time}.png`;
+}
   
 export default async function addMoney(browser) {
     let loggedIn = false;
@@ -22,42 +60,35 @@ export default async function addMoney(browser) {
     const mobile = await askMobile();
     const page2 = await browser.newPage();
     await page2.goto('https://www.sitinetworks.com/LCOLogin.php', { waitUntil: 'domcontentloaded' });
-    //await page2.waitForNavigation({ waitUntil: 'networkidle2' });
-    console.log('🟢 Siti Pay Opened');
+    await waitForPreloaderToDisappear(page2);
     const { userId, password, itzPassword } = getCredentials();
     await page2.type('#ContentPlaceHolder1_txtUserID', userId);
     await page2.type('#ContentPlaceHolder1_txtPassword', password);
-  
-  await countdown(10);
-
-  updateInlineStatus(`Logging in...\n`);
+    updateInlineStatus(`Logging in...`);
   try {
       await page2.click('#ContentPlaceHolder1_btnLCOLogin');
-      await page2.waitForNavigation({ waitUntil: 'networkidle0' });
+      await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
+      await waitForPreloaderToDisappear(page2);
       loggedIn = true;
-      console.log('Logged in successfully\n');
+      updateInlineStatus('Logged in successfully\n');
     } catch (err) {
     console.log('\n❌ Login or navigation failed:', err.message);
     }
     if (loggedIn){
-      await countdown(5);
+      await waitForPreloaderToDisappear(page2);
       try {
         await page2.click('#ContentPlaceHolder1_btnProceed');
         await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
-        await countdown(5);
+        await waitForPreloaderToDisappear(page2);
         try {
           await page2.type('#RechargeAmount', amount.toString());
-          //await page2.waitForSelector('input[value="Pay"]', { visible: true });
           await page2.click('input[value="Pay"]');
           await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
-          await countdown(5);
-          //await page2.waitForSelector('#ContentPlaceHolder1_rbtpaytm', { visible: true });
+          await waitForPreloaderToDisappear(page2);
           await page2.click('#ContentPlaceHolder1_rbtpaytm');
-          //await page2.waitForSelector('#btnConfirm', { visible: true });
           await page2.click('#btnConfirm');
           await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
           await countdown(5);
-          //await page2.waitForSelector('div#checkout-upi input[type="radio"]', { visible: true });
           await page2.click('div#checkout-upi input[type="radio"]');
           await countdown(3);
           await page2.waitForSelector('.ptm-upi-input'); // Waits for at least one to appear
@@ -67,6 +98,7 @@ export default async function addMoney(browser) {
           }
           await page2.click('#checkout-button');
           await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log('⏳ Request sent! Waiting for payment.');
           // Wait up to 8 minutes for navigation to the thankyou page
           try {
             await page2.waitForNavigation({
@@ -82,8 +114,9 @@ export default async function addMoney(browser) {
               if (receiptTableExists) {
                 const receiptElement = await page2.$('#tbl_Receipt');
                 try {
-                  await receiptElement.screenshot({ path: 'receipt_table.png' });
-                  console.log('🧾 Receipt table found and screenshot saved as "receipt_table.png".');
+                  const filename = getReceiptScreenshotFilename();
+                  await receiptElement.screenshot({ path: filename });
+                  console.log(`🧾 Receipt table found and screenshot saved as "${filename}".`);
                 } catch (screenshotErr) {
                   console.error('❌ Failed to capture screenshot of receipt table:', screenshotErr.message);
                 }
@@ -97,27 +130,12 @@ export default async function addMoney(browser) {
             console.error('❌ Timeout or error while waiting for thankyou page:', e.message);
           }
           await pressAnyKeyToContinue();
-          /*try {
-            await page2.waitForFunction(
-              () => {
-                const successInUrl = window.location.href.includes('success'); // or 'thankyou', etc.
-                const successMessage = document.querySelector('.payment-success-message'); // change selector
-                return successInUrl || successMessage;
-              },
-              { timeout: 8 * 60 * 1000, polling: 1000 } // 8 min max, check every 1s
-            );
-          
-            console.log('✅ Payment successful! Final URL:', page.url());
-          } catch (err) {
-            console.log('⏰ Timed out after 8 minutes. Payment may not have completed.');
-          }*/
         }
         catch (err) {
         console.log('\n❌ Couldn\'t find the amount textbox:', err.message);
         }
       } catch (err) {
         console.log('\n❌ Login or navigation failed:', err.message);
-    }
+        }
   }
-    //await page2.screenshot({ path: 'sitiPayTab_screenshot.png', fullPage: true });
 }
