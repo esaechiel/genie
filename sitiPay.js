@@ -1,5 +1,6 @@
 import { getCredentials } from './credentials.js';
 import { askAmount,askMobile } from './inputHelper.js';
+import { pressAnyKeyToContinue } from './continueHandler.js';
 
 function updateInlineStatus(message) {
   process.stdout.clearLine(0);    // Clear the current line
@@ -65,6 +66,37 @@ export default async function addMoney(browser) {
             await inputs[1].type(mobile);
           }
           await page2.click('#checkout-button');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Wait up to 8 minutes for navigation to the thankyou page
+          try {
+            await page2.waitForNavigation({
+              timeout: 8 * 60 * 1000, // 8 minutes
+              waitUntil: 'domcontentloaded'
+            });
+
+            const currentUrl = page2.url();
+
+            if (currentUrl.includes('thankyou.php')) {
+              const receiptTableExists = await page2.$('#tbl_Receipt') !== null;
+
+              if (receiptTableExists) {
+                const receiptElement = await page2.$('#tbl_Receipt');
+                try {
+                  await receiptElement.screenshot({ path: 'receipt_table.png' });
+                  console.log('🧾 Receipt table found and screenshot saved as "receipt_table.png".');
+                } catch (screenshotErr) {
+                  console.error('❌ Failed to capture screenshot of receipt table:', screenshotErr.message);
+                }
+              } else {
+                console.error('❌ Receipt table not found on thankyou page.');
+              }
+            } else {
+              console.error(`❌ Unexpected URL after payment: ${currentUrl}`);
+            }
+          } catch (e) {
+            console.error('❌ Timeout or error while waiting for thankyou page:', e.message);
+          }
+          await pressAnyKeyToContinue();
           /*try {
             await page2.waitForFunction(
               () => {

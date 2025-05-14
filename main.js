@@ -2,9 +2,9 @@ import puppeteer from 'puppeteer';
 import runDunningData from './dunningData.js'
 import addMoney from './sitiPay.js'
 import runDunning from './runDunning.js'
-import { loadCredentials, loadSitiMM } from './credentials.js';
+import { loadCredentials, loadSitiMM, loadSitiRM } from './credentials.js';
 import { getCredentials } from './credentials.js';
-import { askObjective } from './inputHelper.js';
+import { askObjective, askVC, confirmBothAccounts } from './inputHelper.js';
 import { loginOYC } from './login.js';
 import { logout } from './logoutHandler.js'
 import { runSearchSiti } from './searchHandler.js'
@@ -25,8 +25,7 @@ async function runPuppeteer() {
   let exitFlag = false;
   do{
     const objective = await askObjective();
-    console.log(`You have selected - ${objective.label}`);
-    let choice = objective.value;
+    let choice = objective;
     let credentials = null;
     switch (choice){
       case '0': //just login
@@ -49,14 +48,32 @@ async function runPuppeteer() {
         await addMoney(browser);
       break;
       case '2': //get dunning data
-        console.log('Getting Dunning Data...');
-        if (!loggedIn){
-          credentials = await loadCredentials();
-          console.log(`🔐 Logging in as ${credentials.label}`);
-          await loginOYC(browser);
-          loggedIn = true;
+        if(!(await confirmBothAccounts())){//single account
+          console.log('Getting Dunning Data...');
+          if (!loggedIn){
+            credentials = await loadCredentials();
+            console.log(`🔐 Logging in as ${credentials.label}`);
+            await loginOYC(browser);
+            loggedIn = true;
+          }
+          await runDunningData(browser);
         }
-        await runDunningData(browser);
+        else{//both accounts
+          if (!loggedIn){
+            credentials = await loadSitiMM();
+            console.log(`🔐 Logging in as ${credentials.label}`);
+            await loginOYC(browser);
+            loggedIn = true;
+          }
+          await runDunningData(browser);
+          await logout(browser);
+          if (credentials.label === 'MM')
+            credentials = await loadSitiRM();
+          else
+            credentials = await loadSitiMM();
+          await loginOYC(browser);
+          await runDunningData(browser);
+        }
       break;
       case '3': //run dunning
         if (!loggedIn){
@@ -69,14 +86,28 @@ async function runPuppeteer() {
         await runDunning(browser);
       break;
       case '4': //search
+        const query = await askVC();
         if (!loggedIn){
           credentials = await loadSitiMM();
           console.log(`🔐 Logging in as ${credentials.label}`);
           await loginOYC(browser);
           loggedIn = true;
         }
-        console.log('Searching...');
-        await runSearchSiti(browser , 'VC' , '01330267067');
+        credentials = await getCredentials();
+        console.log(`🔍 Searching in ${credentials.label}`);
+        let found = await runSearchSiti(browser , 'VC' , query);
+        //if not found in one account then go to another account
+        if(!found){
+          console.log('Switiching!');
+          await logout(browser);
+          if (credentials.label === 'MM')
+            credentials = await loadSitiRM();
+          else
+            credentials = await loadSitiMM();
+          await loginOYC(browser);
+          console.log(`🔍 Searching in ${credentials.label}`);
+          found = await runSearchSiti(browser , 'VC' , query);
+        }
       break;
       case '5': //logout
         if(loggedIn){

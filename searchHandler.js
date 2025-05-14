@@ -1,3 +1,6 @@
+import { pressAnyKeyToContinue } from './continueHandler.js';
+const bold = text => `\x1b[1m${text}\x1b[0m`; // ANSI bold
+const divider = bold('─'.repeat(40));
 export async function runSearchSiti(browser, queryType, query) {
   const page = await browser.newPage();
   await page.goto('https://biz.sitinetworks.com//Pages/LCO/LCODashboard.aspx', { waitUntil: 'domcontentloaded' });
@@ -11,34 +14,106 @@ export async function runSearchSiti(browser, queryType, query) {
   } else {
     await page.select('#ctl00_ContentPlaceHolder1_ddlSearchFor', '1');
   }
-
+  //making sure the text field is available by clicking on it thrice
   await new Promise(resolve => setTimeout(resolve, 1000));
   await page.click('#ctl00_ContentPlaceHolder1_txtSearchText');
   await new Promise(resolve => setTimeout(resolve, 500));
   await page.click('#ctl00_ContentPlaceHolder1_txtSearchText');
   await new Promise(resolve => setTimeout(resolve, 500));
   await page.click('#ctl00_ContentPlaceHolder1_txtSearchText');
+
   await page.type('#ctl00_ContentPlaceHolder1_txtSearchText', query, { delay: 100 });
   await page.click('#ctl00_ContentPlaceHolder1_btnGo');
   await page.waitForSelector('#ctl00_UpdateProgress1', { hidden: true });
-
-  const rowSelector = '#ctl00_ContentPlaceHolder1_gvItemListSummary > tbody > tr.GridRow';
-  await page.waitForSelector(rowSelector);
   await new Promise(resolve => setTimeout(resolve, 1000));
-  await page.waitForSelector('input[id="ctl00_ContentPlaceHolder1_gvItemListSummary_ctl02_ImgBtnMoreinfo"]');
-  await page.click('input[id="ctl00_ContentPlaceHolder1_gvItemListSummary_ctl02_ImgBtnMoreinfo"]', { timeout: 30000 });
 
-
-  const iframeElement = await page.waitForSelector('#ctl00_ContentPlaceHolder1_IframeBase');
-  const iframe = await iframeElement.contentFrame();
-
-  const subDetails = await getSubDetails(iframe);
-  console.log('\n');
-  console.log(formattedText(subDetails));
-
-  //await page.close();
+  if (!(await checkNoRecordFound(page))){
+    const rowSelector = '#ctl00_ContentPlaceHolder1_gvItemListSummary > tbody > tr.GridRow';
+    await page.waitForSelector(rowSelector);
+    console.log('Getting subscriber details\n\n');
+    //Sub detail frame
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await page.waitForSelector('input[id="ctl00_ContentPlaceHolder1_gvItemListSummary_ctl02_ImgBtnMoreinfo"]');
+    await page.click('input[id="ctl00_ContentPlaceHolder1_gvItemListSummary_ctl02_ImgBtnMoreinfo"]', { timeout: 30000 });
+    const iframeElementInfo = await page.waitForSelector('#ctl00_ContentPlaceHolder1_IframeBase');
+    const iframeInfo = await iframeElementInfo.contentFrame();
+    const subDetails = await getSubDetails(iframeInfo);
+    console.log(formattedText(subDetails, "Subscriber Details"));
+    await page.waitForSelector('#ctl00_ContentPlaceHolder1_PanelExtender');
+    await page.click('#imgClose');
+    const statusDetail = subDetails.find(detail => detail.label === 'Status');
+    if (statusDetail && statusDetail.value.toLowerCase() === 'active') {
+      //Pack detail frame
+      //console.log('\nGetting Pack Details');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await page.waitForSelector('#ctl00_ContentPlaceHolder1_gvItemListSummary_ctl02_ImgBtnInstantRecharge');
+      await page.click('#ctl00_ContentPlaceHolder1_gvItemListSummary_ctl02_ImgBtnInstantRecharge', { timeout: 30000 });
+      const iframeElementRecharge = await page.waitForSelector('#ctl00_ContentPlaceHolder1_IframeBase');
+      const iframeRecharge = await iframeElementRecharge.contentFrame();
+      const packDetails = await getPackDetails(iframeRecharge);
+      console.log(packDetails);
+      await page.waitForSelector('#ctl00_ContentPlaceHolder1_PanelExtender');
+      await page.click('#imgClose');
+    }
+    await pressAnyKeyToContinue();
+    return true;
+  } else{
+    return false;
+  }
 }
 
+async function checkNoRecordFound(page) {
+  try {
+    const rows = await page.$$eval(
+      '#ctl00_ContentPlaceHolder1_gvItemListSummary > tbody > tr',
+      trs => trs.map(tr => tr.textContent.trim())
+    );
+
+    // Check if any row contains "No record found"
+    return rows.some(text => text.toLowerCase().includes('no record found'));
+  } catch (error) {
+    console.error("Error checking for 'No record found':", error);
+    return false; // Assume records exist if check fails
+  }
+}
+
+async function getPackDetails(frame) {
+  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  await frame.waitForSelector('#ctl00_ctl00_ContentPlaceHolder1_Details_gvExistingPackage');
+  await frame.waitForSelector('#ctl00_ctl00_ContentPlaceHolder1_Details_lblgrandtotal_DPO');
+
+  const rows = await frame.$$('#ctl00_ctl00_ContentPlaceHolder1_Details_gvExistingPackage > tbody > tr');
+  
+  const alacarte = [];
+  const paidPackages = [];
+  const freePackages = [];
+
+  for (const row of rows) {
+    const cells = await row.$$eval('td', tds => tds.map(td => td.innerText.trim()));
+    if (cells.length === 0) continue;
+
+    const [pkgCol, channelCol, , , priceCol] = cells;
+
+    const isAlacarte = pkgCol.toLowerCase().includes('alacarte');
+    const isFreeOrFTA = pkgCol.toLowerCase().includes('fta') || pkgCol.toLowerCase().includes('free');
+    const price = parseFloat(priceCol) || 0;
+
+    if (isAlacarte && channelCol) {
+      alacarte.push({ channel: channelCol, package: pkgCol });
+    } else if (isFreeOrFTA && pkgCol) {
+      freePackages.push({ name: pkgCol });
+    } else if (price > 0 && pkgCol) {
+      paidPackages.push({ name: pkgCol, price });
+    }
+  }
+
+  const grandTotalText = await frame.$eval('#ctl00_ctl00_ContentPlaceHolder1_Details_lblgrandtotal_DPO', el => el.innerText.trim());
+  const grandTotal = parseFloat(grandTotalText) || 'Not Found';
+
+  const summaryText = formatPackSummary({ alacarte, paidPackages, freePackages, grandTotal });
+  return summaryText;
+}
 
 async function getSubDetails(page) {
     
@@ -65,19 +140,55 @@ async function getSubDetails(page) {
   return subDetails;
 }
 
-function formattedText(details) {
-  const bold = text => `\x1b[1m${text}\x1b[0m`; // ANSI bold
+function formattedText(details, title, totalWidth = 40) {
+  const separator = '─'.repeat(totalWidth);
+
+  const wrapText = (label, value) => {
+    const labelWidth = 15;
+    const labelText = bold(label.padEnd(labelWidth));
+    const indent = labelWidth + 2;
+    const wrapWidth = totalWidth - indent;
+
+    const words = value.split(' ');
+    const lines = [];
+    let line = '';
+
+    for (const word of words) {
+      if ((line + word).length > wrapWidth) {
+        lines.push(line.trim());
+        line = word + ' ';
+      } else {
+        line += word + ' ';
+      }
+    }
+    if (line.trim()) lines.push(line.trim());
+
+    return lines
+      .map((text, index) =>
+        index === 0
+          ? `${labelText}: ${text}`
+          : ' '.repeat(indent) + text
+      )
+      .join('\n');
+  };
+
+  const formatValue = (label, value) => {
+    if (label.toLowerCase() === 'address') {
+      return wrapText(label, value);
+    } else {
+      return `${bold(label.padEnd(15))}: ${value}`;
+    }
+  };
 
   return (
-    bold('Subscriber Details:\n') +
-    bold('='.repeat(40)) + '\n' +
-    details
-      .map(d => `${bold(d.label.padEnd(15))}: ${d.value}`)
-      .join('\n') +
+    bold(`${title.toUpperCase()}:\n`) +
+    bold(separator) + '\n' +
+    details.map(d => formatValue(d.label, d.value)).join('\n') +
     '\n' +
-    bold('='.repeat(40))
+    bold(separator)
   );
 }
+
 
 async function setDetail(array, page, label, selector) {
   try {
@@ -88,4 +199,41 @@ async function setDetail(array, page, label, selector) {
   } catch (err) {
     console.warn(`Could not extract ${label}: ${err.message}`);
   }
+}
+
+function cleanText(str) {
+  return str
+    .replace(/\(.*?\)/g, '')      // Remove anything inside parentheses
+    .replace(/\s+/g, ' ')         // Replace multiple spaces with a single space
+    .trim()
+    .split(' ')
+    .map(word => {
+      const upperWords = ['FTA', 'DPO', 'UP'];
+      const upper = word.toUpperCase();
+      return upperWords.includes(upper) ? upper : upper[0] + upper.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+function formatPackSummary({ alacarte, paidPackages, freePackages, grandTotal }) {
+
+  const clean = text => cleanText(text); // Assuming cleanText is defined elsewhere
+
+  const section = (title, items, itemFormatter) => {
+    let out = bold(`\n${title}`) + '\n' + divider + '\n';
+    if (items.length === 0) {
+      out += '  None\n';
+    } else {
+      out += items.map(itemFormatter).map(line => '  ' + line).join('\n') + '\n';
+    }
+    return out;
+  };
+
+  const paidSection = section('📦 PAID PACKAGES:', paidPackages, p => clean(p.name));
+  const freeSection = section('🎁 FREE / FTA PACKAGES:', freePackages, p => clean(p.name));
+  const alacarteSection = section('📺 ALACARTE CHANNELS:', alacarte, c => clean(c.channel));
+
+  const total = bold(`\n💰 GRAND TOTAL: ₹${grandTotal}\n`);
+
+  return paidSection + freeSection + alacarteSection + total;
 }

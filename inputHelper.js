@@ -1,6 +1,6 @@
 import readline from 'readline';
 import enquirer from 'enquirer';
-const { Input, Confirm } = enquirer;
+const { Input, Confirm, Select } = enquirer;
 
 function askQuestion(query) {
   const rl = readline.createInterface({
@@ -34,16 +34,28 @@ async function askFromMenu(promptText, menuOptions) {
 }
 
 // Exported prompts using menu
+
 export async function askDaysInput() {
-  const options = [
-    { label: 'Today', value: '0' },
-    { label: 'Tomorrow', value: '1' },
-    { label: 'Next-2 days', value: '2' },
-    { label: 'Next-3 days', value: '3' },
-    { label: 'Next-4 days', value: '4' },
-    { label: 'Next-5 days', value: '5' },
-  ];
-  return await askFromMenu('Select how many days of records to fill:', options);
+  const prompt = new Select({
+    name: 'days',
+    message: 'Select how many days of records to fill:',
+    choices: [
+      { name: '0', message: 'Today' },
+      { name: '1', message: 'Tomorrow' },
+      { name: '2', message: 'Next-2 days' },
+      { name: '3', message: 'Next-3 days' },
+      { name: '4', message: 'Next-4 days' },
+      { name: '5', message: 'Next-5 days' }
+    ]
+  });
+
+  const value = await prompt.run();
+  const selectedValue = prompt.choices.find(choice => choice.name === value);
+  readline.moveCursor(process.stdout, 0, -1);
+  readline.cursorTo(process.stdout, 0);  // Move cursor to the beginning of the line
+  readline.clearLine(process.stdout, 0); // Clear the current line
+  console.log(`✅ You selected: ${selectedValue.message}`); // Print the label
+  return value; // e.g. '0', '1', ..., '5'
 }
 
 export async function askAmount() {
@@ -51,7 +63,7 @@ export async function askAmount() {
 
   while (true) {
     const inputPrompt = new Input({
-      message: 'Enter the amount to fill for each invoice:',
+      message: 'Enter amount:',
       validate(value) {
         return /^\d+$/.test(value) ? true : 'Please enter numbers only';
       }
@@ -82,6 +94,14 @@ export async function askAmount() {
   return amount;
 }
 
+export async function confirmBothAccounts() {
+      const confirmPrompt = new Confirm({
+        message: `Do you want it done for both accounts?`
+      });
+      const confirmed = await confirmPrompt.run();
+  return confirmed;
+}
+
 export async function askMobile() {
   while (true) {
     const inputPrompt = new Input({
@@ -99,16 +119,42 @@ export async function askMobile() {
   }
 }
 
+export async function askVC() {
+  while (true) {
+    const inputPrompt = new Input({
+      message: 'Enter VC number:',
+      validate(value) {
+        return /^\d+$/.test(value) ? true : 'Please enter valid VC number';
+      }
+    });
 
-export async function askAccount() {
-  const options = [
-    { label: 'MM', value: '0' },
-    { label: 'RM', value: '1' }
-  ];
-  return await askFromMenu('Select account:', options);
+    const vc = await inputPrompt.run();
+
+    if (/^\d+$/.test(vc)) {
+      return vc; // Valid input — return it
+    }
+  }
 }
 
-export async function askObjective() {
+
+export async function askAccount() {
+  const prompt = new Select({
+    name: 'account',
+    message: 'Select account:',
+    choices: [
+      { name: '0', message: 'MM' },
+      { name: '1', message: 'RM' }
+    ]
+  });
+
+  const selectedAccount = await prompt.run();
+  readline.moveCursor(process.stdout, 0, -1);
+  readline.cursorTo(process.stdout, 0);  // Move cursor to the beginning of the line
+  readline.clearLine(process.stdout, 0); // Clear the current line
+  return selectedAccount; // returns '0' or '1' as string
+}
+
+/*export async function askObjective() {
   const options = [
     { label: 'Log in OYC', value: '0' },
     { label: 'Add Money', value: '1' },
@@ -120,5 +166,40 @@ export async function askObjective() {
 
   ];
   const index =  await askFromMenu('What would you like to do:', options);
+  const linesToClear = options.length + 3;
+  for (let i = 0; i < linesToClear; i++) {
+    readline.cursorTo(process.stdout, 0);      // Move to start of line
+    readline.clearLine(process.stdout, 0);     // Clear the line
+    readline.moveCursor(process.stdout, 0, -1); // Move up one line
+  }
+  readline.cursorTo(process.stdout, 0);        // Move to start of final cleared line
+  readline.clearLine(process.stdout, 0);
+
   return options.find(opt => opt.value === index);
+}*/
+
+export async function askObjective() {
+  const prompt = new Select({
+    name: 'objective',
+    message: 'What would you like to do:',
+    choices: [
+      { name: '0', message: 'Log in OYC' },
+      { name: '1', message: 'Add Money' },
+      { name: '2', message: 'Get Dunning Data' },
+      { name: '3', message: 'Run Dunning' },
+      { name: '4', message: 'Search' },
+      { name: '5', message: 'Logout' },
+      { name: '-9999', message: 'Exit' },
+    ]
+  });
+
+  const index = await prompt.run();
+  const selectedOption = prompt.choices.find(choice => choice.name === index);
+  readline.moveCursor(process.stdout, 0, -1);
+  readline.cursorTo(process.stdout, 0);  // Move cursor to the beginning of the line
+  readline.clearLine(process.stdout, 0); // Clear the current line
+  console.log(`✅ You selected: ${selectedOption.message}`); // Print the label
+
+  return index;
 }
+

@@ -1,13 +1,16 @@
 // dunning.js
+import { pressAnyKeyToContinue } from './continueHandler.js';
+import { getCredentials } from './credentials.js';
 export default async function runDunningData(browser) {
+  const credentials = await getCredentials();
   const page = await browser.newPage();
-  await page.goto('http://biz.sitinetworks.com/Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
+  await page.goto('https://biz.sitinetworks.com/Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
 
   const balance = await page
     .$eval('#ctl00_ContentPlaceHolder1_lblDealerWalletAmount', el => el.innerText)
     .catch(() => '');
 
-  await page.goto('http://biz.sitinetworks.com/Reports/CustomerDueReport_Prepaid.aspx?Days=0' , { waitUntil: 'domcontentloaded' });
+  await page.goto('https://biz.sitinetworks.com/Reports/CustomerDueReport_Prepaid.aspx?Days=0' , { waitUntil: 'domcontentloaded' });
 
   const rechargeData = await page.evaluate(() => {
     const links = Array.from(document.querySelectorAll('a'));
@@ -25,16 +28,46 @@ export default async function runDunningData(browser) {
 
     return data;
   });
-
-  console.log('\n📊 Recharge data:\n');
-  console.log(`Balance - ₹${balance}\n`);
-  console.log('Date'.padEnd(15) + 'Number'.padEnd(10) + 'Amount');
+  const bold = text => `\x1b[1m${text}\x1b[0m`;
+  const divider = bold('─'.repeat(40));
+  
+  // Column widths
+  const widths = {
+    date: 15,
+    number: 10,
+    amount: 11
+  };
+  
+  const center = (text, width) => {
+    const left = Math.floor((width - text.length) / 2);
+    const right = width - text.length - left;
+    return ' '.repeat(left) + text + ' '.repeat(right);
+  };
+  
+  console.log('\n' + divider);
+  console.log(bold(center(`📊 Recharge data for ${credentials.label}`, 40)));
+  console.log(divider);
+  console.log(center(bold(`Balance - ₹${balance}`), 40) + '\n');
+  
+  // Header row (centered and bold)
+  console.log(
+    '|' + bold(center('Date', widths.date)) +
+    '|' + bold(center('Number', widths.number)) +
+    '|' + bold(center('Amount', widths.amount)) +
+    '|'
+  );
+  
+  // Table rows
   rechargeData.forEach(({ label, count }) => {
     const amount = count * 60;
     console.log(
-      label.padEnd(15) +
-      String(count).padEnd(10) +
-      `₹${amount}`
+      '|' + label.padEnd(widths.date) +
+      '|' + String(count).padEnd(widths.number) +
+      '|' + `₹${amount}`.padEnd(widths.amount) +
+      '|'
     );
   });
+  
+  console.log(divider);
+  await pressAnyKeyToContinue();
 }

@@ -77,7 +77,7 @@ async function waitForPageUpdateAfterSubmit(page, submitSelector) {
 
 export default async function runDunning(browser) {
     const page2 = await browser.newPage();
-    await page2.goto('http://biz.sitinetworks.com//Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
+    await page2.goto('https://biz.sitinetworks.com//Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
   
     try {
       await selectDayRange(page2);

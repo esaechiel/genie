@@ -34,7 +34,7 @@ export async function loginOYC(browser) {
     updateInlineStatus(`🖼️ Capturing captcha...`);
     const captchaElement = await sitiCableTab.$('#ctl00_ContentPlaceHolder1_CaptchaCode1_Image1');
     if (!captchaElement) {
-      console.log('❌ Captcha image not found. Retrying...');
+      updateInlineStatus('❌ Captcha image not found. Retrying...');
       continue;
     }
     await captchaElement.screenshot({ path: 'captcha_screenshot.png' });
@@ -76,13 +76,16 @@ export async function loginOYC(browser) {
       subAttempts = 1;
       continue;
     } else {
-      updateInlineStatus('We`re in\n');
+      readline.cursorTo(process.stdout, 0);      // Move to start of line
+      readline.clearLine(process.stdout, 0);     // Clear the line
+      readline.moveCursor(process.stdout, 0, -1); // Move up one line
+      updateInlineStatus(`Logged in after ${attempts} attempts.\n`);
       success = true;
       break;
     }
   }
 
   if (!success) {
-    console.log('❌ Exceeded max attempts. Login failed.');
+    updateInlineStatus('❌ Exceeded max attempts. Login failed.');
   }
 }
