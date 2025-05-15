@@ -1,6 +1,7 @@
 // dunning.js
 import { pressAnyKeyToContinue } from './continueHandler.js';
 import { getCredentials } from './credentials.js';
+import { closeAll } from './logoutHandler.js';
 export default async function runDunningData(browser) {
   const credentials = await getCredentials();
   const page = await browser.newPage();
@@ -69,5 +70,6 @@ export default async function runDunningData(browser) {
   });
   
   console.log(divider);
+  await closeAll(browser);
   await pressAnyKeyToContinue();
 }

@@ -136,6 +136,24 @@ export async function askVC() {
   }
 }
 
+export async function askSTB() {
+  while (true) {
+    const inputPrompt = new Input({
+      message: 'Enter STB number:',
+      validate(value) {
+        return /^[a-zA-Z0-9]+$/.test(value)
+          ? true
+          : 'Please enter a valid STB number';
+      }
+    });
+
+    const stb = await inputPrompt.run();
+
+    if (/^[a-zA-Z0-9]+$/.test(stb)) {
+      return stb;
+    }
+  }
+}
 
 export async function askAccount() {
   const prompt = new Select({
@@ -146,12 +164,29 @@ export async function askAccount() {
       { name: '1', message: 'RM' }
     ]
   });
-
+  
   const selectedAccount = await prompt.run();
   readline.moveCursor(process.stdout, 0, -1);
   readline.cursorTo(process.stdout, 0);  // Move cursor to the beginning of the line
   readline.clearLine(process.stdout, 0); // Clear the current line
   return selectedAccount; // returns '0' or '1' as string
+}
+
+export async function askQueryTypeSiti() {
+  const prompt = new Select({
+    name: 'sitiQueryType',
+    message: 'Select type:',
+    choices: [
+      { name: 'VC', message: 'VC' },
+      { name: 'STB', message: 'STB' }
+    ]
+  });
+
+  const selectedType = await prompt.run();
+  readline.moveCursor(process.stdout, 0, -1);
+  readline.cursorTo(process.stdout, 0);  // Move cursor to the beginning of the line
+  readline.clearLine(process.stdout, 0); // Clear the current line
+  return selectedType;
 }
 
 /*export async function askObjective() {

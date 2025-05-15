@@ -9,3 +9,13 @@ export async function logout(browser){
           }
           console.log('Logged out successfully and cleared tabs');
 }
+
+export async function closeAll(browser) {
+  const newPage = await browser.newPage();
+  const pages = await browser.pages();
+  for (const page of pages) {  // Close all other tabs except the new one
+    if (page !== newPage) {
+      await page.close();
+    }
+  }
+}

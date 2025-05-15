@@ -18,7 +18,7 @@ export async function loginOYC(browser) {
   let success = false;
   let attempts = 1;
   let subAttempts = 1;
-  while (attempts < 5 && !success) {
+  while (attempts < 10 && !success) {
     if(subAttempts === 1){
       if(attempts > 1){
         readline.clearLine(process.stdout, 0);

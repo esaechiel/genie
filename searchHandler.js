@@ -1,6 +1,8 @@
 import { pressAnyKeyToContinue } from './continueHandler.js';
+import { closeAll } from './logoutHandler.js';
 const bold = text => `\x1b[1m${text}\x1b[0m`; // ANSI bold
 const divider = bold('─'.repeat(40));
+let success = false;
 export async function runSearchSiti(browser, queryType, query) {
   const page = await browser.newPage();
   await page.goto('https://biz.sitinetworks.com//Pages/LCO/LCODashboard.aspx', { waitUntil: 'domcontentloaded' });
@@ -28,6 +30,7 @@ export async function runSearchSiti(browser, queryType, query) {
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   if (!(await checkNoRecordFound(page))){
+    success = true;
     const rowSelector = '#ctl00_ContentPlaceHolder1_gvItemListSummary > tbody > tr.GridRow';
     await page.waitForSelector(rowSelector);
     console.log('Getting subscriber details\n\n');
@@ -55,9 +58,14 @@ export async function runSearchSiti(browser, queryType, query) {
       await page.waitForSelector('#ctl00_ContentPlaceHolder1_PanelExtender');
       await page.click('#imgClose');
     }
-    await pressAnyKeyToContinue();
+    if(success){
+      await closeAll(browser);
+      await pressAnyKeyToContinue();
+    }
+    await closeAll(browser);
     return true;
   } else{
+    await closeAll(browser);
     return false;
   }
 }
@@ -75,6 +83,62 @@ async function checkNoRecordFound(page) {
     console.error("Error checking for 'No record found':", error);
     return false; // Assume records exist if check fails
   }
+}
+
+async function checkNoRecordFoundOnLocator(page, queryType) {
+  const emptyRowSelector = `#ctl00_ContentPlaceHolder1_gv`+`${queryType}`+`No > tbody > tr.GridEmptyRow > td`;
+  try {
+    await page.waitForSelector(emptyRowSelector, { timeout: 5000 });
+    const cellText = await page.$eval(emptyRowSelector, el => el.innerText.trim().toLowerCase());
+    return cellText.includes('no record found');
+  } catch (err) {
+    // Either the selector didn't match, or something else went wrong
+    console.warn('⚠️ Error while checking for empty record row:', err.message);
+    return false;
+  }
+}
+
+export async function searchLocator(browser, queryType, query) {
+  const page = await browser.newPage();
+  if (queryType === 'VC')
+    await page.goto('https://biz.sitinetworks.com//Pages/Utilities/VClocator.aspx', { waitUntil: 'domcontentloaded' });
+  else
+    await page.goto('https://biz.sitinetworks.com//Pages/Utilities/STBlocator.aspx', { waitUntil: 'domcontentloaded' });
+  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  await page.click(`#ctl00_ContentPlaceHolder1_txt${queryType}No`);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  await page.click(`#ctl00_ContentPlaceHolder1_txt${queryType}No`);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  await page.click(`#ctl00_ContentPlaceHolder1_txt${queryType}No`);
+  await page.type(`#ctl00_ContentPlaceHolder1_txt${queryType}No`, query, { delay: 100 });
+  await page.click('#ctl00_ContentPlaceHolder1_btnSubmit');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  await page.waitForSelector('#ctl00_UpdateProgress1', { hidden: true });
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  let found = !(await checkNoRecordFoundOnLocator(page, queryType));
+
+  if(found)
+  {
+    const boxDetails = [
+      { label: 'VC', value: '-1' },
+      { label: 'STB', value: '-1' },
+      { label: 'Status', value: '-1' },
+      { label: 'LCO', value: '-1' },
+    ];
+
+    await setDetail(boxDetails, page, 'VC', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(2)`);
+    await setDetail(boxDetails, page, 'STB', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(3)`);
+    await setDetail(boxDetails, page, 'Status', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(1)`);
+    await setDetail(boxDetails, page, 'LCO', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(7)`);
+    
+    console.log(formattedText(boxDetails, "Other Cable Box Details"));
+  }
+  else{
+    console.log(bold(`NOT FOUND IN BOTH ACCOUNTS`));
+  }
+  await closeAll(browser);
+  await pressAnyKeyToContinue();
 }
 
 async function getPackDetails(frame) {
@@ -188,7 +252,6 @@ function formattedText(details, title, totalWidth = 40) {
     bold(separator)
   );
 }
-
 
 async function setDetail(array, page, label, selector) {
   try {

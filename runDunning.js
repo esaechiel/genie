@@ -1,6 +1,7 @@
 import { ConsoleMessage } from 'puppeteer';
 import { askDaysInput } from './inputHelper.js';
 import { getCredentials } from './credentials.js';
+import { closeAll } from './logoutHandler.js';
 
 function updateInlineStatus(message) {
   process.stdout.clearLine(0);    // Clear the current line
@@ -108,6 +109,7 @@ export default async function runDunning(browser) {
         updateInlineStatus(`Clicking Submit\n`);
         await waitForPageUpdateAfterSubmit(page2, '#ctl00_ContentPlaceHolder1_Button1');
         updateInlineStatus(`✅ Submission complete\n`);
+        await closeAll(browser);
       }
       else{
         console.log('❌ Insufficient balance');

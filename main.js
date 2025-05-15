@@ -4,10 +4,10 @@ import addMoney from './sitiPay.js'
 import runDunning from './runDunning.js'
 import { loadCredentials, loadSitiMM, loadSitiRM } from './credentials.js';
 import { getCredentials } from './credentials.js';
-import { askObjective, askVC, confirmBothAccounts } from './inputHelper.js';
+import { askObjective, askQueryTypeSiti, askVC, askSTB, confirmBothAccounts } from './inputHelper.js';
 import { loginOYC } from './login.js';
 import { logout } from './logoutHandler.js'
-import { runSearchSiti } from './searchHandler.js'
+import { runSearchSiti, searchLocator } from './searchHandler.js'
 
 const startTime = performance.now();
 
@@ -67,6 +67,7 @@ async function runPuppeteer() {
           }
           await runDunningData(browser);
           await logout(browser);
+          credentials = await getCredentials();
           if (credentials.label === 'MM')
             credentials = await loadSitiRM();
           else
@@ -86,7 +87,12 @@ async function runPuppeteer() {
         await runDunning(browser);
       break;
       case '4': //search
-        const query = await askVC();
+        const queryType = await askQueryTypeSiti();
+        let query;
+        if(queryType === 'VC')
+          query = await askVC();
+        else
+          query = await askSTB();
         if (!loggedIn){
           credentials = await loadSitiMM();
           console.log(`🔐 Logging in as ${credentials.label}`);
@@ -95,7 +101,7 @@ async function runPuppeteer() {
         }
         credentials = await getCredentials();
         console.log(`🔍 Searching in ${credentials.label}`);
-        let found = await runSearchSiti(browser , 'VC' , query);
+        let found = await runSearchSiti(browser , queryType , query);
         //if not found in one account then go to another account
         if(!found){
           console.log('Switiching!');
@@ -106,7 +112,10 @@ async function runPuppeteer() {
             credentials = await loadSitiMM();
           await loginOYC(browser);
           console.log(`🔍 Searching in ${credentials.label}`);
-          found = await runSearchSiti(browser , 'VC' , query);
+          found = await runSearchSiti(browser , queryType , query);
+          if (!found){
+            await searchLocator(browser, queryType , query);
+          }
         }
       break;
       case '5': //logout

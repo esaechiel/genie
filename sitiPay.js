@@ -2,6 +2,7 @@ import fs from 'fs';
 import { getCredentials } from './credentials.js';
 import { askAmount,askMobile } from './inputHelper.js';
 import { pressAnyKeyToContinue } from './continueHandler.js';
+import { closeAll } from './logoutHandler.js';
 
 if (!fs.existsSync('Payment_Screenshots')) {
   fs.mkdirSync('Payment_Screenshots');
@@ -129,6 +130,7 @@ export default async function addMoney(browser) {
           } catch (e) {
             console.error('❌ Timeout or error while waiting for thankyou page:', e.message);
           }
+          await closeAll(browser);
           await pressAnyKeyToContinue();
         }
         catch (err) {
