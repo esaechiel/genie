@@ -2,7 +2,7 @@
 import { pressAnyKeyToContinue } from './continueHandler.js';
 import { getCredentials } from './credentials.js';
 import { closeAll } from './logoutHandler.js';
-export default async function runDunningData(browser) {
+export default async function runDunningData(browser, both) {
   const credentials = await getCredentials();
   const page = await browser.newPage();
   await page.goto('https://biz.sitinetworks.com/Pages/LCO/PrepaidMultipleRecharge.aspx', { waitUntil: 'domcontentloaded' });
@@ -71,5 +71,6 @@ export default async function runDunningData(browser) {
   
   console.log(divider);
   await closeAll(browser);
+  if (!both)
   await pressAnyKeyToContinue();
 }

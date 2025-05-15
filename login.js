@@ -10,7 +10,7 @@ function updateInlineStatus(message) {
 }
 
 
-export async function loginOYC(browser) {
+export async function loginOYC(browser, silent) {
 
   const sitiCableTab = await browser.newPage();
   const { userId, password, itzPassword } = getCredentials();
@@ -20,42 +20,52 @@ export async function loginOYC(browser) {
   let subAttempts = 1;
   while (attempts < 10 && !success) {
     if(subAttempts === 1){
-      if(attempts > 1){
+      if(attempts > 1 && !silent){
         readline.clearLine(process.stdout, 0);
         readline.moveCursor(process.stdout, 0, -1);
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0);
       }
-    process.stdout.write(`Login Attempt ${attempts}\n\r`);
+      if (!silent)
+        process.stdout.write(`Login Attempt ${attempts}\n\r`);
   }
+    if (!silent)
     updateInlineStatus(`🌐 Opening Siti Networks...`);
     await sitiCableTab.goto('https://biz.sitinetworks.com' , { waitUntil: 'networkidle0' });
 
+    if (!silent)
     updateInlineStatus(`🖼️ Capturing captcha...`);
     const captchaElement = await sitiCableTab.$('#ctl00_ContentPlaceHolder1_CaptchaCode1_Image1');
     if (!captchaElement) {
+      if (!silent)
       updateInlineStatus('❌ Captcha image not found. Retrying...');
       continue;
     }
     await captchaElement.screenshot({ path: 'captcha_screenshot.png' });
+    if (!silent)
     updateInlineStatus(`🤖 Solving captcha...`);
     let captchaCode;
     try {
       captchaCode = await solveCaptcha();
     } catch (err) {
+      if (!silent)
       console.error('❌ Failed to solve captcha');
       break;
     }
     if (captchaCode === '-1') {
+      if (!silent)
       updateInlineStatus(`🔁 Captcha failed, retrying...`);
       subAttempts++;
       continue; // Retry the loop
     }
+    if (!silent)
     updateInlineStatus(`✅ Captcha solved: ${captchaCode}`);
     await sitiCableTab.type('#ctl00_ContentPlaceHolder1_CaptchaCode1_txtCapchaCode', captchaCode);
+    if (!silent)
     updateInlineStatus(`🔐 Entering credentials...`);
     await sitiCableTab.type('#ctl00_ContentPlaceHolder1_txtUserID', userId);
     await sitiCableTab.type('#ctl00_ContentPlaceHolder1_txtPassword', password);
+    if (!silent)
     updateInlineStatus(`🚪 Logging in...`);
     try {
       await Promise.all([
@@ -63,6 +73,7 @@ export async function loginOYC(browser) {
         sitiCableTab.click('#ctl00_ContentPlaceHolder1_btnLogin')
       ]);
     } catch (err) {
+      if (!silent)
       console.log('❌ Login or navigation failed. Retrying...');
     }
 
@@ -71,15 +82,18 @@ export async function loginOYC(browser) {
     const errorText = await sitiCableTab.$eval('#ctl00_lblMessage', el => el.innerText).catch(() => '');
 
     if (errorText.includes('Invalid captcha code')) {
+      if (!silent)
       updateInlineStatus(`⚠️ Invalid captcha entered.`);
       attempts++;
       subAttempts = 1;
       continue;
     } else {
+      if (!silent){
       readline.cursorTo(process.stdout, 0);      // Move to start of line
       readline.clearLine(process.stdout, 0);     // Clear the line
       readline.moveCursor(process.stdout, 0, -1); // Move up one line
       updateInlineStatus(`Logged in after ${attempts} attempts.\n`);
+    }
       success = true;
       break;
     }

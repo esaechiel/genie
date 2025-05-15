@@ -26,6 +26,7 @@ export async function runSearchSiti(browser, queryType, query) {
 
   await page.type('#ctl00_ContentPlaceHolder1_txtSearchText', query, { delay: 100 });
   await page.click('#ctl00_ContentPlaceHolder1_btnGo');
+  await new Promise(resolve => setTimeout(resolve, 500));
   await page.waitForSelector('#ctl00_UpdateProgress1', { hidden: true });
   await new Promise(resolve => setTimeout(resolve, 1000));
 

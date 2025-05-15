@@ -1,4 +1,4 @@
-export async function logout(browser){
+export async function logout(browser, silent){
     const newPage = await browser.newPage();
           await newPage.goto('https://biz.sitinetworks.com//Logout.aspx', { waitUntil: 'domcontentloaded' });
           const pages = await browser.pages();
@@ -7,6 +7,7 @@ export async function logout(browser){
               await page.close();
             }
           }
+          if (!silent)
           console.log('Logged out successfully and cleared tabs');
 }
 

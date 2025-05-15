@@ -30,7 +30,6 @@ async function runPuppeteer() {
     switch (choice){
       case '0': //just login
         if (!loggedIn){
-          console.log('Attempting Login...');
           credentials = await loadCredentials();
           console.log(`🔐 Logging in as ${credentials.label}`);
           await loginOYC(browser);
@@ -61,18 +60,17 @@ async function runPuppeteer() {
         else{//both accounts
           if (!loggedIn){
             credentials = await loadSitiMM();
-            console.log(`🔐 Logging in as ${credentials.label}`);
-            await loginOYC(browser);
+            await loginOYC(browser, true);
             loggedIn = true;
           }
-          await runDunningData(browser);
-          await logout(browser);
+          await runDunningData(browser, true);
+          await logout(browser, true);
           credentials = await getCredentials();
           if (credentials.label === 'MM')
             credentials = await loadSitiRM();
           else
             credentials = await loadSitiMM();
-          await loginOYC(browser);
+          await loginOYC(browser, true);
           await runDunningData(browser);
         }
       break;
@@ -95,8 +93,7 @@ async function runPuppeteer() {
           query = await askSTB();
         if (!loggedIn){
           credentials = await loadSitiMM();
-          console.log(`🔐 Logging in as ${credentials.label}`);
-          await loginOYC(browser);
+          await loginOYC(browser, true);
           loggedIn = true;
         }
         credentials = await getCredentials();
@@ -104,13 +101,13 @@ async function runPuppeteer() {
         let found = await runSearchSiti(browser , queryType , query);
         //if not found in one account then go to another account
         if(!found){
-          console.log('Switiching!');
-          await logout(browser);
+          //console.log('Switiching!');
+          await logout(browser, true);
           if (credentials.label === 'MM')
             credentials = await loadSitiRM();
           else
             credentials = await loadSitiMM();
-          await loginOYC(browser);
+          await loginOYC(browser, true);
           console.log(`🔍 Searching in ${credentials.label}`);
           found = await runSearchSiti(browser , queryType , query);
           if (!found){
