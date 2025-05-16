@@ -58,6 +58,21 @@ export async function askDaysInput() {
   return value; // e.g. '0', '1', ..., '5'
 }
 
+export async function askSender() {
+  const prompt = new Select({
+    name: 'sender',
+    message: 'Select sender:',
+    choices: [
+      { name: '8127802802', message: 'Megha Arora' },
+      { name: '9336820382', message: 'Manish Arora' },
+      { name: 'Other', message: 'Other' }
+    ]
+  });
+
+  const value = await prompt.run();
+  return value; // e.g. '0', '1', ..., '5'
+}
+
 export async function askAmount() {
   let amount;
 
@@ -95,10 +110,10 @@ export async function askAmount() {
 }
 
 export async function confirmBothAccounts() {
-      const confirmPrompt = new Confirm({
-        message: `Do you want it done for both accounts?`
-      });
-      const confirmed = await confirmPrompt.run();
+  const confirmPrompt = new Confirm({
+    message: `Do you want it done for both accounts?`
+  });
+  const confirmed = await confirmPrompt.run();
   return confirmed;
 }
 
@@ -164,7 +179,7 @@ export async function askAccount() {
       { name: '1', message: 'RM' }
     ]
   });
-  
+
   const selectedAccount = await prompt.run();
   readline.moveCursor(process.stdout, 0, -1);
   readline.cursorTo(process.stdout, 0);  // Move cursor to the beginning of the line

@@ -23,33 +23,32 @@ async function runPuppeteer() {
   });
   let loggedIn = false;
   let exitFlag = false;
-  do{
+  do {
     const objective = await askObjective();
     let choice = objective;
     let credentials = null;
-    switch (choice){
+    switch (choice) {
       case '0': //just login
-        if (!loggedIn){
+        if (!loggedIn) {
           credentials = await loadCredentials();
           console.log(`🔐 Logging in as ${credentials.label}`);
           await loginOYC(browser);
           loggedIn = true;
         }
-        else{
+        else {
           credentials = await getCredentials();
           console.log(`Already logged in as ${credentials.label}`);
         }
-      break;
+        break;
       case '1': //add money
         console.log('Adding Money...');
         credentials = await loadCredentials();
-        console.log(`🔐 Logging in as ${credentials.label}`);
         await addMoney(browser);
-      break;
+        break;
       case '2': //get dunning data
-        if(!(await confirmBothAccounts())){//single account
+        if (!(await confirmBothAccounts())) {//single account
           console.log('Getting Dunning Data...');
-          if (!loggedIn){
+          if (!loggedIn) {
             credentials = await loadCredentials();
             console.log(`🔐 Logging in as ${credentials.label}`);
             await loginOYC(browser);
@@ -57,8 +56,8 @@ async function runPuppeteer() {
           }
           await runDunningData(browser);
         }
-        else{//both accounts
-          if (!loggedIn){
+        else {//both accounts
+          if (!loggedIn) {
             credentials = await loadSitiMM();
             await loginOYC(browser, true);
             loggedIn = true;
@@ -73,9 +72,9 @@ async function runPuppeteer() {
           await loginOYC(browser, true);
           await runDunningData(browser);
         }
-      break;
+        break;
       case '3': //run dunning
-        if (!loggedIn){
+        if (!loggedIn) {
           credentials = await loadCredentials();
           console.log(`🔐 Logging in as ${credentials.label}`);
           await loginOYC(browser);
@@ -83,24 +82,24 @@ async function runPuppeteer() {
         }
         console.log('Recharging Accounts...');
         await runDunning(browser);
-      break;
+        break;
       case '4': //search
         const queryType = await askQueryTypeSiti();
         let query;
-        if(queryType === 'VC')
+        if (queryType === 'VC')
           query = await askVC();
         else
           query = await askSTB();
-        if (!loggedIn){
+        if (!loggedIn) {
           credentials = await loadSitiMM();
           await loginOYC(browser, true);
           loggedIn = true;
         }
         credentials = await getCredentials();
         console.log(`🔍 Searching in ${credentials.label}`);
-        let found = await runSearchSiti(browser , queryType , query);
+        let found = await runSearchSiti(browser, queryType, query);
         //if not found in one account then go to another account
-        if(!found){
+        if (!found) {
           //console.log('Switiching!');
           await logout(browser, true);
           if (credentials.label === 'MM')
@@ -109,32 +108,32 @@ async function runPuppeteer() {
             credentials = await loadSitiMM();
           await loginOYC(browser, true);
           console.log(`🔍 Searching in ${credentials.label}`);
-          found = await runSearchSiti(browser , queryType , query);
-          if (!found){
-            await searchLocator(browser, queryType , query);
+          found = await runSearchSiti(browser, queryType, query);
+          if (!found) {
+            await searchLocator(browser, queryType, query);
           }
         }
-      break;
+        break;
       case '5': //logout
-        if(loggedIn){
+        if (loggedIn) {
           await logout(browser);
           loggedIn = false;
         }
-        else{
+        else {
           console.log('Logged out already');
         }
-      break;
+        break;
       case '-9999': //exit
         console.log(`Exiting...`);
         await browser.close();
-        exitFlag=true;  
-      break;
+        exitFlag = true;
+        break;
     }
-  }while(!exitFlag);
+  } while (!exitFlag);
 
-    const endTime = performance.now();  // End measuring
-    const executionTime =Math.round(((endTime - startTime) / 1000) * 100) / 100;  // Convert to seconds
-    console.log(`Total script execution time: ${executionTime} seconds`);
-  }
+  const endTime = performance.now();  // End measuring
+  const executionTime = Math.round(((endTime - startTime) / 1000) * 100) / 100;  // Convert to seconds
+  console.log(`Total script execution time: ${executionTime} seconds`);
+}
 
 runPuppeteer();
