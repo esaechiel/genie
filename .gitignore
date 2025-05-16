@@ -1,7 +1,6 @@
 .env
 ./captchas/
 ./python_tools/
-./main.js
 ./package.json
 ./package-lock.json
 ./preload.js
