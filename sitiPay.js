@@ -14,6 +14,27 @@ function updateInlineStatus(message) {
   process.stdout.write(message);  // Write the new message
 }
 
+function startEightMinuteCountdown() {
+  let stop = false;
+
+  const countdown = (async () => {
+    const totalSeconds = 8 * 60;
+    for (let i = totalSeconds; i > 0; i--) {
+      if (stop) break;
+      const minutes = Math.floor(i / 60).toString().padStart(2, '0');
+      const seconds = (i % 60).toString().padStart(2, '0');
+      updateInlineStatus(`⏳ Waiting for payment... ${minutes}:${seconds} remaining`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    updateInlineStatus(''); // Clear line when done or stopped
+  })();
+
+  return {
+    stop: () => { stop = true; },
+    countdown
+  };
+}
+
 async function countdown(seconds) {
   for (let i = seconds; i > 0; i--) {
     process.stdout.write(`⏳ Waiting for the page to load (${i} seconds)  \r`);
@@ -22,6 +43,7 @@ async function countdown(seconds) {
 }
 
 async function waitForPreloaderToDisappear(page, timeout = 30000) {
+  //await new Promise(resolve => setTimeout(resolve, 500));
   try {
     await page.waitForFunction(() => {
       const spinner = document.querySelector('#form1 > div:nth-child(6) > div > div > i');
@@ -31,7 +53,6 @@ async function waitForPreloaderToDisappear(page, timeout = 30000) {
     console.warn('⚠️ Timeout while waiting for preloader to disappear:', err.message);
   }
 }
-
 
 function getReceiptScreenshotFilename(folder = 'Payment_Screenshots') {
   const cred = getCredentials();
@@ -55,9 +76,13 @@ function getReceiptScreenshotFilename(folder = 'Payment_Screenshots') {
   return `${folder}/Payment_${cred.label}_${date}_${time}.png`;
 }
 
-export default async function addMoney(browser) {
+export default async function addMoney(browser, amt) {
   let loggedIn = false;
-  const amount = await askAmount();
+  let amount;
+  if (!amt)
+    amount = await askAmount();
+  else
+    amount = String(amt);
   let mobile = await askSender();
   if (mobile === 'Other')
     mobile = await askMobile();
@@ -70,10 +95,10 @@ export default async function addMoney(browser) {
   updateInlineStatus(`Logging in...`);
   try {
     await page2.click('#ContentPlaceHolder1_btnLCOLogin');
-    await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
-    await waitForPreloaderToDisappear(page2);
+    await page2.waitForNavigation({ waitUntil: 'networkidle0' });
     loggedIn = true;
     updateInlineStatus('Logged in successfully\n');
+    await waitForPreloaderToDisappear(page2);
   } catch (err) {
     console.log('\n❌ Login or navigation failed:', err.message);
   }
@@ -81,16 +106,16 @@ export default async function addMoney(browser) {
     await waitForPreloaderToDisappear(page2);
     try {
       await page2.click('#ContentPlaceHolder1_btnProceed');
-      await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
+      await page2.waitForNavigation({ waitUntil: 'networkidle0' });
       await waitForPreloaderToDisappear(page2);
       try {
         await page2.type('#RechargeAmount', amount.toString());
         await page2.click('input[value="Pay"]');
-        await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
+        await page2.waitForNavigation({ waitUntil: 'networkidle0' });
         await waitForPreloaderToDisappear(page2);
         await page2.click('#ContentPlaceHolder1_rbtpaytm');
         await page2.click('#btnConfirm');
-        await page2.waitForNavigation({ waitUntil: 'domcontentloaded' });
+        await page2.waitForNavigation({ waitUntil: 'networkidle0' });
         await countdown(5);
         await page2.click('div#checkout-upi input[type="radio"]');
         await countdown(3);
@@ -104,10 +129,18 @@ export default async function addMoney(browser) {
         console.log('⏳ Request sent! Waiting for payment.');
         // Wait up to 8 minutes for navigation to the thankyou page
         try {
-          await page2.waitForNavigation({
-            timeout: 8 * 60 * 1000, // 8 minutes
-            waitUntil: 'domcontentloaded'
-          });
+          const countdownController = startEightMinuteCountdown();
+
+          try {
+            await page2.waitForNavigation({
+              timeout: 8 * 60 * 1000,
+              waitUntil: 'domcontentloaded'
+            });
+          } finally {
+            countdownController.stop(); // Always stop the countdown whether success or error
+            await countdownController.countdown; // Ensure countdown fully finishes cleanup
+          }
+          
 
           const currentUrl = page2.url();
 
@@ -118,6 +151,7 @@ export default async function addMoney(browser) {
               const receiptElement = await page2.$('#tbl_Receipt');
               try {
                 const filename = getReceiptScreenshotFilename();
+                await new Promise(resolve => setTimeout(resolve, 500));
                 await waitForPreloaderToDisappear(page2);
                 await receiptElement.screenshot({ path: filename });
                 console.log(`✅ Payment successful - screenshot saved.`);

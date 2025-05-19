@@ -237,8 +237,9 @@ export async function askObjective() {
       { name: '1', message: 'Add Money' },
       { name: '2', message: 'Get Dunning Data' },
       { name: '3', message: 'Run Dunning' },
-      { name: '4', message: 'Search' },
-      { name: '5', message: 'Logout' },
+      { name: '4', message: 'Auto Dunning' },
+      { name: '5', message: 'Search' },
+      { name: '6', message: 'Logout' },
       { name: '-9999', message: 'Exit' },
     ]
   });

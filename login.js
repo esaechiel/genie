@@ -1,6 +1,14 @@
 import { getCredentials } from './credentials.js';
+import path from 'path';
 import readline from 'readline';
 import { solveCaptcha } from './captchaHandler.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// Required setup for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 
 
 function updateInlineStatus(message) {
@@ -10,15 +18,17 @@ function updateInlineStatus(message) {
 }
 
 
-export async function loginOYC(browser, silent) {
+export async function loginOYC(browser, silent, credentials) {
 
   const sitiCableTab = await browser.newPage();
-  const { userId, password, itzPassword } = getCredentials();
-
+  const { userId, password, itzPassword } = credentials;
+  const url = credentials.label === 'MM' ? 'https://biz.sitinetworks.com' : 'https://ebiz.sitinetworks.com';
+  const imageName = credentials.label === 'MM' ? 'captcha_screenshot_MM.png' : 'captcha_screenshot_RM.png';
+  const absoluteImagePath = path.resolve(__dirname, imageName);
   let success = false;
   let attempts = 1;
   let subAttempts = 1;
-  while (attempts < 10 && !success) {
+  while (attempts < 11 && !success) {
     if(subAttempts === 1){
       if(attempts > 1 && !silent){
         readline.clearLine(process.stdout, 0);
@@ -31,7 +41,7 @@ export async function loginOYC(browser, silent) {
   }
     if (!silent)
     updateInlineStatus(`🌐 Opening Siti Networks...`);
-    await sitiCableTab.goto('https://biz.sitinetworks.com' , { waitUntil: 'networkidle0' });
+    await sitiCableTab.goto(url , { waitUntil: 'networkidle0' });
 
     if (!silent)
     updateInlineStatus(`🖼️ Capturing captcha...`);
@@ -41,12 +51,12 @@ export async function loginOYC(browser, silent) {
       updateInlineStatus('❌ Captcha image not found. Retrying...');
       continue;
     }
-    await captchaElement.screenshot({ path: 'captcha_screenshot.png' });
+    await captchaElement.screenshot({ path: absoluteImagePath });
     if (!silent)
     updateInlineStatus(`🤖 Solving captcha...`);
     let captchaCode;
     try {
-      captchaCode = await solveCaptcha();
+      captchaCode = await solveCaptcha(absoluteImagePath);
     } catch (err) {
       if (!silent)
       console.error('❌ Failed to solve captcha');
@@ -102,4 +112,5 @@ export async function loginOYC(browser, silent) {
   if (!success) {
     updateInlineStatus('❌ Exceeded max attempts. Login failed.');
   }
+  return success;
 }

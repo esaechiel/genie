@@ -1,10 +1,23 @@
+import argparse
 from PIL import Image
 import pytesseract
 import cv2
 import numpy as np
+import os
+
+# Argument parser
+parser = argparse.ArgumentParser(description='Solve CAPTCHA from an image file.')
+parser.add_argument('image_path', type=str, help='Path to the CAPTCHA image')
+
+args = parser.parse_args()
+image_path = args.image_path
+
+if not os.path.exists(image_path):
+    print("❌ File does not exist.")
+    exit(1)
 
 # Load image
-image_path = r"C:\Users\Sahil\my-puppeteer-project/captcha_screenshot.png"
+#image_path = r"C:\Users\Sahil\my-puppeteer-project/captcha_screenshot.png"
 image = cv2.imread(image_path)
 #cv2.imshow("Original", image)
 
@@ -30,8 +43,8 @@ thresh = cv2.adaptiveThreshold(
 inverted = cv2.bitwise_not(thresh)
 
 # OCR using pytesseract
-custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-captcha_text = pytesseract.image_to_string(inverted, config=custom_config)
+custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+captcha_text = pytesseract.image_to_string(image, config=custom_config)
 
 # Strip any extra whitespace or newlines from the result
 captcha_text = captcha_text.strip()

@@ -6,10 +6,10 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export const solveCaptcha = () => {
+export const solveCaptcha = (imagePath) => {
   return new Promise((resolve, reject) => {
     const pythonScriptPath = path.join(__dirname, 'solver.py');
-    const command = `python3 "${pythonScriptPath}"`; // Use "python3" if needed
+    const command = `python3 "${pythonScriptPath}" "${imagePath}"`; // Use "python3" if needed
 
     exec(command, (error, stdout) => {
       if (error) {

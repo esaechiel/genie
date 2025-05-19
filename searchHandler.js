@@ -3,9 +3,10 @@ import { closeAll } from './logoutHandler.js';
 const bold = text => `\x1b[1m${text}\x1b[0m`; // ANSI bold
 const divider = bold('─'.repeat(40));
 let success = false;
-export async function runSearchSiti(browser, queryType, query) {
+export async function runSearchSiti(credentials, browser, queryType, query) {
   const page = await browser.newPage();
-  await page.goto('https://biz.sitinetworks.com//Pages/LCO/LCODashboard.aspx', { waitUntil: 'domcontentloaded' });
+  const dashboardPageURL = credentials.label === 'MM' ? 'https://biz.sitinetworks.com//Pages/LCO/LCODashboard.aspx' : 'https://ebiz.sitinetworks.com//Pages/LCO/LCODashboard.aspx';
+  await page.goto(dashboardPageURL, { waitUntil: 'domcontentloaded' });
 
   await page.waitForSelector('#ctl00_ContentPlaceHolder1_ddlSearchFor', { timeout: 30000 });
 
@@ -30,7 +31,7 @@ export async function runSearchSiti(browser, queryType, query) {
   await page.waitForSelector('#ctl00_UpdateProgress1', { hidden: true });
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  if (!(await checkNoRecordFound(page))){
+  if (!(await checkNoRecordFound(page))) {
     success = true;
     const rowSelector = '#ctl00_ContentPlaceHolder1_gvItemListSummary > tbody > tr.GridRow';
     await page.waitForSelector(rowSelector);
@@ -59,13 +60,9 @@ export async function runSearchSiti(browser, queryType, query) {
       await page.waitForSelector('#ctl00_ContentPlaceHolder1_PanelExtender');
       await page.click('#imgClose');
     }
-    if(success){
-      await closeAll(browser);
-      await pressAnyKeyToContinue();
-    }
     await closeAll(browser);
     return true;
-  } else{
+  } else {
     await closeAll(browser);
     return false;
   }
@@ -87,14 +84,14 @@ async function checkNoRecordFound(page) {
 }
 
 async function checkNoRecordFoundOnLocator(page, queryType) {
-  const emptyRowSelector = `#ctl00_ContentPlaceHolder1_gv`+`${queryType}`+`No > tbody > tr.GridEmptyRow > td`;
+  const emptyRowSelector = `#ctl00_ContentPlaceHolder1_gv` + `${queryType}` + `No > tbody > tr.GridEmptyRow > td`;
   try {
     await page.waitForSelector(emptyRowSelector, { timeout: 5000 });
     const cellText = await page.$eval(emptyRowSelector, el => el.innerText.trim().toLowerCase());
     return cellText.includes('no record found');
   } catch (err) {
     // Either the selector didn't match, or something else went wrong
-    console.warn('⚠️ Error while checking for empty record row:', err.message);
+    //console.warn('⚠️ Error while checking for empty record row:', err.message);
     return false;
   }
 }
@@ -105,7 +102,7 @@ export async function searchLocator(browser, queryType, query) {
     await page.goto('https://biz.sitinetworks.com//Pages/Utilities/VClocator.aspx', { waitUntil: 'domcontentloaded' });
   else
     await page.goto('https://biz.sitinetworks.com//Pages/Utilities/STBlocator.aspx', { waitUntil: 'domcontentloaded' });
-  
+
   await new Promise(resolve => setTimeout(resolve, 1000));
   await page.click(`#ctl00_ContentPlaceHolder1_txt${queryType}No`);
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -119,8 +116,7 @@ export async function searchLocator(browser, queryType, query) {
   await new Promise(resolve => setTimeout(resolve, 1000));
   let found = !(await checkNoRecordFoundOnLocator(page, queryType));
 
-  if(found)
-  {
+  if (found) {
     const boxDetails = [
       { label: 'VC', value: '-1' },
       { label: 'STB', value: '-1' },
@@ -132,24 +128,25 @@ export async function searchLocator(browser, queryType, query) {
     await setDetail(boxDetails, page, 'STB', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(3)`);
     await setDetail(boxDetails, page, 'Status', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(1)`);
     await setDetail(boxDetails, page, 'LCO', `#ctl00_ContentPlaceHolder1_gv${queryType}No > tbody > tr.GridRow > td:nth-child(7)`);
-    
+
     console.log(formattedText(boxDetails, "Other Cable Box Details"));
   }
-  else{
-    console.log(bold(`NOT FOUND IN BOTH ACCOUNTS`));
+  else {
+    console.log(bold(`❌ NOT FOUND`));
   }
   await closeAll(browser);
-  await pressAnyKeyToContinue();
+  return found;
+  //await pressAnyKeyToContinue();
 }
 
 async function getPackDetails(frame) {
-  
+
   await new Promise(resolve => setTimeout(resolve, 1000));
   await frame.waitForSelector('#ctl00_ctl00_ContentPlaceHolder1_Details_gvExistingPackage');
   await frame.waitForSelector('#ctl00_ctl00_ContentPlaceHolder1_Details_lblgrandtotal_DPO');
 
   const rows = await frame.$$('#ctl00_ctl00_ContentPlaceHolder1_Details_gvExistingPackage > tbody > tr');
-  
+
   const alacarte = [];
   const paidPackages = [];
   const freePackages = [];
@@ -181,7 +178,7 @@ async function getPackDetails(frame) {
 }
 
 async function getSubDetails(page) {
-    
+
   const subDetails = [
     { label: 'Name', value: '-1' },
     { label: 'Address', value: '-1' },
