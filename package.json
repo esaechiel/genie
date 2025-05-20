@@ -2,9 +2,9 @@
   "name": "my-puppeteer-project",
   "type": "module",
   "version": "1.0.0",
-  "main": "login.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node login.js"
+    "start": "node main.js"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +13,7 @@
   "dependencies": {
     "dotenv": "^16.5.0",
     "enquirer": "^2.4.1",
+    "ora": "^8.2.0",
     "puppeteer": "^24.7.2"
   }
 }
